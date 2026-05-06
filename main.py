@@ -223,7 +223,7 @@ async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"🍦 Mahsulot: {d['product']}\n"
         f"🔢 Miqdor: {d['qty']} ta\n"
         f"💰 Jami: *{d['total']:,} so'm*\n\n"
-        f"📱 Telegram: @{user.username or 'noma\\'lum'}\n"
+        f"📱 Telegram: @{user.username or \"noma'lum\"}\n"
         f"🆔 User ID: {user.id}"
     )
 
