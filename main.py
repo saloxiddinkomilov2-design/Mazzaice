@@ -22,9 +22,9 @@ load_dotenv()
 # SOZLAMALAR
 # =============================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OWNER_ID = int(os.getenv("OWNER_ID"))
+OWNER_ID = int(os.getenv("OWNER_ID", 0))
 
-if not BOT_TOKEN or not OWNER_ID:
+if not BOT_TOKEN or OWNER_ID == 0:
     raise ValueError("❌ BOT_TOKEN yoki OWNER_ID topilmadi! .env faylni tekshiring.")
 
 # =============================================
