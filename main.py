@@ -216,6 +216,7 @@ async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     # Egaga xabar yuborish
+    username = user.username if user.username else "noma'lum"
     owner_msg = (
         f"🔔 *YANGI BUYURTMA!*\n\n"
         f"👤 Ism: {d['name']}\n"
@@ -223,7 +224,7 @@ async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"🍦 Mahsulot: {d['product']}\n"
         f"🔢 Miqdor: {d['qty']} ta\n"
         f"💰 Jami: *{d['total']:,} so'm*\n\n"
-        f"📱 Telegram: @{user.username or \"noma'lum\"}\n"
+        f"📱 Telegram: @{username}\n"
         f"🆔 User ID: {user.id}"
     )
 
