@@ -65,11 +65,18 @@ def delivery_info(total: int, distance_km: float) -> str:
     """Yetkazib berish narxi va matnini qaytaradi."""
     if total >= FREE_DELIVERY_MIN and distance_km <= FREE_DELIVERY_KM:
         return f"🚚 Yetkazib berish: *BEPUL* (10 km ichida, 50,000 so'mdan yuqori)"
+    elif distance_km <= 5:
+        return (
+            f"🚚 Yetkazib berish: *10,000 so'm*\n"
+            f"   📍 Masofa: {distance_km:.1f} km (5 km ichida)"
+        )
     else:
-        cost = round(distance_km) * DELIVERY_PER_KM
+        extra_km = distance_km - 5
+        cost = 10000 + round(extra_km) * 2000
         return (
             f"🚚 Yetkazib berish: *{cost:,} so'm*\n"
-            f"   📍 Masofa: {distance_km:.1f} km × 1,000 so'm"
+            f"   📍 Masofa: {distance_km:.1f} km\n"
+            f"   (10,000 + {round(extra_km)} km × 2,000 so'm)"
         )
 
 
