@@ -21,7 +21,7 @@ OWNER_ID = int(os.getenv("OWNER_ID", 0))
 if not BOT_TOKEN or OWNER_ID == 0:
     raise ValueError("❌ BOT_TOKEN yoki OWNER_ID topilmadi! .env faylni tekshiring.")
 
-NAME, PHONE, PRODUCT, QTY, MORE, CONFIRM = range(6)
+NAME, PHONE, PRODUCT, QTY, MORE, CONFIRM, RECEIPT = range(7)
 
 # Menyu — emoji YO'Q, faqat sof matn (Telegram tugma matni bilan mos keladi)
 MENU = {
@@ -294,10 +294,61 @@ async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"🎉 *Buyurtmangiz qabul qilindi!*\n\n"
-        f"Tez orada siz bilan bog'lanamiz.\n"
-        f"📞 +998 91 107 19 96\n\n"
         f"💳 *To'lov uchun karta raqami:*\n"
         f"`9860030367057004`\n\n"
+        f"📸 Iltimos, to'lov chekini yuboring\n"
+        f"(rasm yoki matn shaklida):",
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardMarkup(
+            [["❌ Bekor qilish"]], resize_keyboard=True
+        )
+    )
+    return RECEIPT
+
+
+async def get_receipt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.message.text and update.message.text == "❌ Bekor qilish":
+        return await cancel(update, ctx)
+
+    d = ctx.user_data
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else "yo'q"
+
+    # Egaga chekni forward qilish
+    caption = (
+        f"🧾 *CHEK KELDI!*\n\n"
+        f"👤 Ism: {d.get('name', '?')}\n"
+        f"📞 Telefon: {d.get('phone', '?')}\n"
+        f"📱 Telegram: {username}"
+    )
+
+    try:
+        if update.message.photo:
+            # Rasm chek
+            photo = update.message.photo[-1].file_id
+            await ctx.bot.send_photo(
+                chat_id=OWNER_ID,
+                photo=photo,
+                caption=caption,
+                parse_mode="Markdown"
+            )
+        elif update.message.text:
+            # Matn chek
+            await ctx.bot.send_message(
+                chat_id=OWNER_ID,
+                text=caption + f"\n\n📝 Chek: {update.message.text}",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text("⚠️ Iltimos, chek rasmini yoki matnini yuboring!")
+            return RECEIPT
+    except Exception as e:
+        logging.error(f"Chek yuborishda xato: {e}")
+
+    await update.message.reply_text(
+        f"✅ *Chek qabul qilindi!*\n\n"
+        f"Tez orada siz bilan bog'lanamiz.\n"
+        f"📞 +998 91 107 19 96\n\n"
         f"Rahmat! Mazza ni tanlaguningiz uchun 🍦",
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(
@@ -333,6 +384,7 @@ def main():
             QTY:     [MessageHandler(filters.TEXT & ~filters.COMMAND, get_qty)],
             MORE:    [MessageHandler(filters.TEXT & ~filters.COMMAND, more_or_confirm)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_order)],
+            RECEIPT: [MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND, get_receipt)],
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
@@ -347,10 +399,6 @@ def main():
 
     print("🍦 Mazza bot ishga tushdi!")
     app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
