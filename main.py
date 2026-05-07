@@ -349,7 +349,7 @@ async def get_receipt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"✅ *Chek qabul qilindi!*\n\n"
         f"Tez orada siz bilan bog'lanamiz.\n"
         f"📞 +998 91 107 19 96\n\n"
-        f"Rahmat! Mazza ni tanlaguningiz uchun 🍦",
+        f"Rahmat! Mazza ni tanlaganingiz uchun 🍦",
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(
             [["🍦 Buyurtma berish"], ["📋 Menyu", "📞 Aloqa"]], resize_keyboard=True
