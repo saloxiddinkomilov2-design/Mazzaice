@@ -5,6 +5,7 @@
 """
 
 import os
+import math
 import logging
 from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
@@ -21,7 +22,14 @@ OWNER_ID = int(os.getenv("OWNER_ID", 0))
 if not BOT_TOKEN or OWNER_ID == 0:
     raise ValueError("❌ BOT_TOKEN yoki OWNER_ID topilmadi! .env faylni tekshiring.")
 
-NAME, PHONE, PRODUCT, QTY, MORE, CONFIRM, RECEIPT = range(7)
+NAME, PHONE, PRODUCT, QTY, MORE, CONFIRM, RECEIPT, LOCATION = range(8)
+
+# Do'kon koordinatasi
+SHOP_LAT = 40.477144
+SHOP_LON = 71.650935
+FREE_DELIVERY_MIN = 50000   # 50,000 so'm dan oshsa bepul (10 km ichida)
+FREE_DELIVERY_KM  = 10      # bepul yetkazib berish masofasi (km)
+DELIVERY_PER_KM   = 1000    # har km uchun narx (so'm)
 
 # Menyu — emoji YO'Q, faqat sof matn (Telegram tugma matni bilan mos keladi)
 MENU = {
@@ -42,6 +50,27 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+
+
+def haversine(lat1, lon1, lat2, lon2) -> float:
+    """Ikki nuqta orasidagi masofani km da hisoblaydi."""
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def delivery_info(total: int, distance_km: float) -> str:
+    """Yetkazib berish narxi va matnini qaytaradi."""
+    if total >= FREE_DELIVERY_MIN and distance_km <= FREE_DELIVERY_KM:
+        return f"🚚 Yetkazib berish: *BEPUL* (10 km ichida, 50,000 so'mdan yuqori)"
+    else:
+        cost = round(distance_km) * DELIVERY_PER_KM
+        return (
+            f"🚚 Yetkazib berish: *{cost:,} so'm*\n"
+            f"   📍 Masofa: {distance_km:.1f} km × 1,000 so'm"
+        )
 
 
 def find_menu_key(text: str):
@@ -233,22 +262,15 @@ async def more_or_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return PRODUCT
 
     if text == "✅ Buyurtmani tasdiqlash":
-        cart = ctx.user_data["cart"]
-        total = sum(i["price"] * i["qty"] for i in cart)
-        summary = (
-            f"📋 *Buyurtma ma'lumotlari:*\n\n"
-            f"👤 Ism: {ctx.user_data['name']}\n"
-            f"📞 Telefon: {ctx.user_data['phone']}\n\n"
-            f"🛒 *Mahsulotlar:*\n{cart_text(cart)}\n\n"
-            f"✅ Tasdiqlaysizmi?"
-        )
+        loc_btn = KeyboardButton("📍 Joylashuvni yuborish", request_location=True)
         await update.message.reply_text(
-            summary, parse_mode="Markdown",
+            "📍 Yetkazib berish narxini hisoblash uchun\n"
+            "joylashuvingizni yuboring:",
             reply_markup=ReplyKeyboardMarkup(
-                [["✅ Tasdiqlash"], ["❌ Bekor qilish"]], resize_keyboard=True
+                [[loc_btn], ["❌ Bekor qilish"]], resize_keyboard=True
             )
         )
-        return CONFIRM
+        return LOCATION
 
     await update.message.reply_text(
         "⚠️ Tugmalardan birini tanlang.",
@@ -258,6 +280,49 @@ async def more_or_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     )
     return MORE
+
+
+async def get_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.message.text and update.message.text == "❌ Bekor qilish":
+        return await cancel(update, ctx)
+
+    if not update.message.location:
+        loc_btn = KeyboardButton("📍 Joylashuvni yuborish", request_location=True)
+        await update.message.reply_text(
+            "⚠️ Iltimos, joylashuvni tugma orqali yuboring!",
+            reply_markup=ReplyKeyboardMarkup(
+                [[loc_btn], ["❌ Bekor qilish"]], resize_keyboard=True
+            )
+        )
+        return LOCATION
+
+    user_lat = update.message.location.latitude
+    user_lon = update.message.location.longitude
+    distance = haversine(SHOP_LAT, SHOP_LON, user_lat, user_lon)
+
+    ctx.user_data["distance"] = distance
+    ctx.user_data["user_lat"] = user_lat
+    ctx.user_data["user_lon"] = user_lon
+
+    cart = ctx.user_data["cart"]
+    total = sum(i["price"] * i["qty"] for i in cart)
+    delivery = delivery_info(total, distance)
+
+    summary = (
+        f"📋 *Buyurtma ma'lumotlari:*\n\n"
+        f"👤 Ism: {ctx.user_data['name']}\n"
+        f"📞 Telefon: {ctx.user_data['phone']}\n\n"
+        f"🛒 *Mahsulotlar:*\n{cart_text(cart)}\n\n"
+        f"{delivery}\n\n"
+        f"✅ Tasdiqlaysizmi?"
+    )
+    await update.message.reply_text(
+        summary, parse_mode="Markdown",
+        reply_markup=ReplyKeyboardMarkup(
+            [["✅ Tasdiqlash"], ["❌ Bekor qilish"]], resize_keyboard=True
+        )
+    )
+    return CONFIRM
 
 
 async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -276,12 +341,16 @@ async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         items_text += f"  • {item['product']} x{item['qty']} = {item['price']*item['qty']:,} so'm\n"
 
     username = f"@{user.username}" if user.username else "yo'q"
+    distance = d.get("distance", 0)
+    delivery = delivery_info(total, distance)
+
     owner_msg = (
         f"🔔 *YANGI BUYURTMA!*\n\n"
         f"👤 Ism: {d['name']}\n"
         f"📞 Telefon: {d['phone']}\n\n"
         f"🛒 Mahsulotlar:\n{items_text}\n"
         f"💰 *Jami: {total:,} so'm*\n\n"
+        f"{delivery}\n\n"
         f"💳 Karta: `9860030367057004`\n\n"
         f"📱 Telegram: {username}\n"
         f"🆔 User ID: {user.id}"
@@ -289,6 +358,13 @@ async def confirm_order(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     try:
         await ctx.bot.send_message(chat_id=OWNER_ID, text=owner_msg, parse_mode="Markdown")
+        # Mijoz lokatsiyasini egaga yuborish
+        if d.get("user_lat") and d.get("user_lon"):
+            await ctx.bot.send_location(
+                chat_id=OWNER_ID,
+                latitude=d["user_lat"],
+                longitude=d["user_lon"]
+            )
     except Exception as e:
         logging.error(f"Egaga xabar yuborishda xato: {e}")
 
@@ -349,7 +425,7 @@ async def get_receipt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"✅ *Chek qabul qilindi!*\n\n"
         f"Tez orada siz bilan bog'lanamiz.\n"
         f"📞 +998 91 107 19 96\n\n"
-        f"Rahmat! Mazza ni tanlaganingiz uchun 🍦",
+        f"Rahmat! Mazza ni tanlaguningiz uchun 🍦",
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(
             [["🍦 Buyurtma berish"], ["📋 Menyu", "📞 Aloqa"]], resize_keyboard=True
@@ -383,6 +459,7 @@ def main():
             PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_product)],
             QTY:     [MessageHandler(filters.TEXT & ~filters.COMMAND, get_qty)],
             MORE:    [MessageHandler(filters.TEXT & ~filters.COMMAND, more_or_confirm)],
+            LOCATION:[MessageHandler((filters.TEXT | filters.LOCATION) & ~filters.COMMAND, get_location)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_order)],
             RECEIPT: [MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND, get_receipt)],
         },
