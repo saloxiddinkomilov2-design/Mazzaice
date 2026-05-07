@@ -35,17 +35,18 @@ NAME, PHONE, PRODUCT, QTY, CONFIRM = range(5)
 # Menyu
 MENU = {
     "🍦 Yumshoq Muzqaymoq (kg)": 40000,
-    "   KATTA IDISH 0.7KG":      30000,
-    "   IDISH 0.5KG " :          20000,
-    "   0.4L IDISH ":            15000,
-    "   0.3L IDISH ":            10000,
-    "   0.2L IDISH ":              5000,
-    "🍦 Rojok — Katta":           5000,
-    "🍦 Fakel — Kichkina":        3000,
-    "🥤 Gazli Suv 250ml":         2000,
-    "🥤 Gazli Suv 500ml":         4000,
-    "🥤 Gazli Suv 1 litr":        7000,
+    "KATTA IDISH 0.7KG": 30000,
+    "IDISH 0.5KG": 20000,
+    "0.4L IDISH": 15000,
+    "0.3L IDISH": 10000,
+    "0.2L IDISH": 5000,
+    "🍦 Rojok — Katta": 5000,
+    "🍦 Fakel — Kichkina": 3000,
+    "🥤 Gazli Suv 250ml": 2000,
+    "🥤 Gazli Suv 500ml": 4000,
+    "🥤 Gazli Suv 1 litr": 7000,
 }
+
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
